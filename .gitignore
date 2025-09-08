@@ -1,0 +1,11 @@
+/backend.md
+/frontend.md
+node_modules
+.env
+.env.bak
+backend/node_modules
+backend/.env.bak
+backend/.env
+frontend/node_modules
+frontend/.env.bak
+frontend/.env
