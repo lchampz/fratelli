@@ -2,38 +2,94 @@ import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
+import { validateAuth, handleValidationErrors } from '../middleware/validation.js';
+import { authLimiter } from '../middleware/rateLimiter.js';
+import { CustomError } from '../middleware/errorHandler.js';
 
 export const router = Router();
 
-router.post('/register', async (req: Request, res: Response) => {
-	const { email, password } = req.body as { email: string; password: string };
-	if (!email || !password) return res.status(400).json({ message: 'E-mail e senha são obrigatórios' });
-	const exists = await prisma.user.findUnique({ where: { email } });
-	if (exists) return res.status(409).json({ message: 'Usuário já existe' });
-	const passwordHash = await bcrypt.hash(password, 10);
-	const user = await prisma.user.create({ data: { email, passwordHash } });
-	res.status(201).json({ id: user.id, email: user.email });
-});
-
-router.post('/login', async (req: Request, res: Response) => {
-	const { email, password } = req.body as { email: string; password: string };
-	if (!email || !password) return res.status(400).json({ message: 'Credenciais inválidas' });
-	const user = await prisma.user.findUnique({ where: { email } });
-	if (!user) return res.status(401).json({ message: 'Credenciais inválidas' });
-	const ok = await bcrypt.compare(password, user.passwordHash);
-	if (!ok) return res.status(401).json({ message: 'Credenciais inválidas' });
-	const token = jwt.sign({ sub: user.id, email }, process.env.JWT_SECRET ?? 'devsecret', { expiresIn: '1d' });
-	res.json({ token, user: { id: user.id, email: user.email } });
-});
-
-router.get('/me', (req: Request, res: Response) => {
-	const auth = req.headers.authorization;
-	if (!auth) return res.status(401).json({ message: 'Token ausente' });
-	const token = auth.replace('Bearer ', '');
+router.post('/register', authLimiter, validateAuth, handleValidationErrors, async (req: Request, res: Response, next) => {
 	try {
-		const payload = jwt.verify(token, process.env.JWT_SECRET ?? 'devsecret');
-		res.json({ user: payload });
-	} catch {
-		res.status(401).json({ message: 'Token inválido' });
+		const { email, password } = req.body as { email: string; password: string };
+		
+		const exists = await prisma.user.findUnique({ where: { email } });
+		if (exists) {
+			return next(new CustomError('Usuário já existe', 409));
+		}
+		
+		const passwordHash = await bcrypt.hash(password, 12);
+		const user = await prisma.user.create({ 
+			data: { email, passwordHash },
+			select: { id: true, email: true, createdAt: true }
+		});
+		
+		res.status(201).json({ 
+			success: true,
+			message: 'Usuário criado com sucesso',
+			data: user 
+		});
+	} catch (error) {
+		next(error);
+	}
+});
+
+router.post('/login', authLimiter, validateAuth, handleValidationErrors, async (req: Request, res: Response, next) => {
+	try {
+		const { email, password } = req.body as { email: string; password: string };
+		
+		const user = await prisma.user.findUnique({ where: { email } });
+		if (!user) {
+			return next(new CustomError('Credenciais inválidas', 401));
+		}
+		
+		const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+		if (!isValidPassword) {
+			return next(new CustomError('Credenciais inválidas', 401));
+		}
+		
+		const token = jwt.sign(
+			{ sub: user.id, email: user.email }, 
+			process.env.JWT_SECRET!, 
+			{ expiresIn: '7d' }
+		);
+		
+		res.json({ 
+			success: true,
+			message: 'Login realizado com sucesso',
+			data: { 
+				token, 
+				user: { id: user.id, email: user.email } 
+			}
+		});
+	} catch (error) {
+		next(error);
+	}
+});
+
+router.get('/me', async (req: Request, res: Response, next) => {
+	try {
+		const auth = req.headers.authorization;
+		if (!auth) {
+			return next(new CustomError('Token de acesso ausente', 401));
+		}
+		
+		const token = auth.replace('Bearer ', '');
+		const payload = jwt.verify(token, process.env.JWT_SECRET!) as any;
+		
+		const user = await prisma.user.findUnique({
+			where: { id: payload.sub },
+			select: { id: true, email: true, createdAt: true }
+		});
+		
+		if (!user) {
+			return next(new CustomError('Usuário não encontrado', 404));
+		}
+		
+		res.json({ 
+			success: true,
+			data: { user }
+		});
+	} catch (error) {
+		next(error);
 	}
 }); 

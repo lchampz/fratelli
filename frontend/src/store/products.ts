@@ -19,10 +19,11 @@ export const useProductsStore = create<ProductsState>((set, get) => ({
 	async list() {
 		set({ loading: true, error: null });
 		try {
-			const { data } = await api.get<Product[]>('/products');
-			set({ items: data, loading: false });
-		} catch (e: any) {
-			set({ error: e?.response?.data?.message ?? 'Falha ao buscar produtos', loading: false });
+			const response = await api.get<{ success: boolean; data: Product[]; pagination: any }>('/products');
+			set({ items: response.data.data, loading: false });
+		} catch (e: unknown) {
+			const error = e as { response?: { data?: { message?: string } } };
+			set({ error: error?.response?.data?.message ?? 'Falha ao buscar produtos', loading: false });
 		}
 	},
 	async create(payload) {

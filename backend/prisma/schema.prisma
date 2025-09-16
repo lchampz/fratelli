@@ -12,22 +12,36 @@ model User {
     email        String   @unique
     passwordHash String
     createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    @@index([email])
 }
 
 model Product {
     id           String             @id @default(cuid())
     name         String
     quantity     Float              @default(0)
+    pricePerGram Float?             @default(0)
     createdAt    DateTime           @default(now())
+    updatedAt    DateTime           @updatedAt
+    deletedAt    DateTime?
     items        RecipeIngredient[]
     consumptions Consumption[]
+
+    @@index([name])
+    @@index([deletedAt])
 }
 
 model Recipe {
     id          String             @id @default(cuid())
     name        String
     createdAt   DateTime           @default(now())
+    updatedAt   DateTime           @updatedAt
+    deletedAt   DateTime?
     ingredients RecipeIngredient[]
+
+    @@index([name])
+    @@index([deletedAt])
 }
 
 model RecipeIngredient {
@@ -50,4 +64,7 @@ model Consumption {
     createdAt DateTime @default(now())
 
     product Product @relation(fields: [productId], references: [id])
+
+    @@index([productId])
+    @@index([createdAt])
 }

@@ -26,8 +26,9 @@ export const useReportsStore = create<ReportsState>((set) => ({
 		try {
 			const { data } = await api.get<Product[]>('/reports/stock');
 			set({ stock: data, loading: false });
-		} catch (e: any) {
-			set({ error: e?.response?.data?.message ?? 'Failed to fetch stock', loading: false });
+		} catch (e: unknown) {
+			const error = e as { response?: { data?: { message?: string } } };
+			set({ error: error?.response?.data?.message ?? 'Failed to fetch stock', loading: false });
 		}
 	},
 	async fetchCapability() {
@@ -35,8 +36,9 @@ export const useReportsStore = create<ReportsState>((set) => ({
 		try {
 			const { data } = await api.get<Capability[]>('/reports/capability');
 			set({ capability: data, loading: false });
-		} catch (e: any) {
-			set({ error: e?.response?.data?.message ?? 'Failed to fetch capability', loading: false });
+		} catch (e: unknown) {
+			const error = e as { response?: { data?: { message?: string } } };
+			set({ error: error?.response?.data?.message ?? 'Failed to fetch capability', loading: false });
 		}
 	},
 	async fetchHistory() {
@@ -44,8 +46,9 @@ export const useReportsStore = create<ReportsState>((set) => ({
 		try {
 			const { data } = await api.get<Consumption[]>('/reports/history');
 			set({ history: data, loading: false });
-		} catch (e: any) {
-			set({ error: e?.response?.data?.message ?? 'Failed to fetch history', loading: false });
+		} catch (e: unknown) {
+			const error = e as { response?: { data?: { message?: string } } };
+			set({ error: error?.response?.data?.message ?? 'Failed to fetch history', loading: false });
 		}
 	},
 })); 

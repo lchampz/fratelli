@@ -5,6 +5,7 @@ export type Product = {
 	name: string;
 	unit: string;
 	quantity: number;
+	pricePerGram?: number;
 	createdAt: string;
 };
 

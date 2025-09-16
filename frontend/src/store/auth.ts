@@ -14,7 +14,10 @@ type AuthState = {
 };
 
 const initialToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-if (initialToken) setAuthToken(initialToken);
+if (initialToken) {
+	console.log('Token inicial carregado:', initialToken.substring(0, 20) + '...');
+	setAuthToken(initialToken);
+}
 
 export const useAuthStore = create<AuthState>((set, get) => ({
 	token: initialToken,
@@ -24,12 +27,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 	async login(email, password) {
 		set({ loading: true, error: null });
 		try {
-			const { data } = await api.post('/auth/login', { email, password });
-			setAuthToken(data.token);
-			localStorage.setItem('auth_token', data.token);
-			set({ token: data.token, user: data.user, loading: false });
-		} catch (e: any) {
-			set({ error: e?.response?.data?.message ?? 'Login failed', loading: false });
+			const response = await api.post('/auth/login', { email, password });
+			const { data } = response;
+			
+			// Verificar se a resposta tem o formato esperado
+			if (data.success && data.data) {
+				const { token, user } = data.data;
+				setAuthToken(token);
+				localStorage.setItem('auth_token', token);
+				set({ token, user, loading: false });
+			} else {
+				// Fallback para formato antigo
+				setAuthToken(data.token);
+				localStorage.setItem('auth_token', data.token);
+				set({ token: data.token, user: data.user, loading: false });
+			}
+		} catch (error) {
+			const errorMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Erro ao fazer login';
+			set({ error: errorMessage, loading: false });
+			throw new Error(errorMessage);
 		}
 	},
 	async register(email, password) {
@@ -37,8 +53,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 		try {
 			await api.post('/auth/register', { email, password });
 			await get().login(email, password);
-		} catch (e: any) {
-			set({ error: e?.response?.data?.message ?? 'Register failed', loading: false });
+		} catch (error) {
+			const errorMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Register failed';
+			set({ error: errorMessage, loading: false });
 		}
 	},
 	logout() {
@@ -49,7 +66,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 	async fetchMe() {
 		try {
 			const { data } = await api.get('/auth/me');
-			set({ user: data.user });
+			
+			// Verificar se a resposta tem o formato esperado
+			if (data.success && data.data) {
+				set({ user: data.data.user });
+			} else {
+				// Fallback para formato antigo
+				set({ user: data.user });
+			}
 		} catch {
 			set({ token: null, user: null });
 		}
